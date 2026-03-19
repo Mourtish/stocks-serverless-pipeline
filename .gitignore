@@ -33,4 +33,11 @@ venv/
 # ============================================
 # OS FILES
 # ============================================
-.DS_Store
+.DS_Store# Secrets
+*.pem
+*.key
+.env
+.env.local
+terraform.tfvars
+aws_credentials
+~/.aws/

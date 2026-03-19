@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stock Market Movers - Daily Watch</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+
+        .navbar {
+            background: white;
+            padding: 15px 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+
+        .navbar-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #667eea;
+        }
+
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            color: #666;
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            background: #27ae60;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        .hero {
+            background: white;
+            border-radius: 12px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .hero h1 {
+            font-size: 2.5em;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .hero p {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 25px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .stat-box-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-box-value {
+            font-size: 2em;
+            font-weight: 700;
+        }
+
+        .section-title {
+            color: white;
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .ranking {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .stock-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+            border-left: 5px solid #667eea;
+        }
+
+        .stock-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        }
+
+        .stock-card.positive {
+            border-left-color: #27ae60;
+        }
+
+        .stock-card.negative {
+            border-left-color: #e74c3c;
+        }
+
+        .stock-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .stock-ticker {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .live-badge {
+            display: inline-block;
+            background: #27ae60;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+
+        .live-badge::before {
+            content: "● ";
+            margin-right: 4px;
+        }
+
+        .change-amount {
+            font-size: 1.8em;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .change-amount.positive {
+            color: #27ae60;
+        }
+
+        .change-amount.negative {
+            color: #e74c3c;
+        }
+
+        .price-info {
+            color: #666;
+            font-size: 0.95em;
+            margin-bottom: 15px;
+        }
+
+        .trend-bar {
+            background: #f0f0f0;
+            border-radius: 10px;
+            height: 8px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .trend-fill {
+            height: 100%;
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+
+        .trend-fill.positive {
+            background: linear-gradient(90deg, #27ae60 0%, #2ecc71 100%);
+        }
+
+        .trend-fill.negative {
+            background: linear-gradient(90deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .trend-label {
+            font-size: 0.9em;
+            color: #999;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px 20px;
+            color: white;
+        }
+
+        .loader {
+            border: 4px solid rgba(255,255,255,0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fef3f3;
+            border-left: 4px solid #e74c3c;
+            padding: 20px;
+            border-radius: 8px;
+            color: #c0392b;
+            margin: 20px 0;
+        }
+
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255,255,255,0.7);
+            margin-top: 40px;
+        }
+
+        .rank-badge {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .gains-losers {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .gains-losers-box {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        .gains-losers-box h3 {
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .gains-losers-box.gainers h3 {
+            color: #27ae60;
+        }
+
+        .gains-losers-box.losers h3 {
+            color: #e74c3c;
+        }
+
+        .mini-ticker {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 0.95em;
+        }
+
+        .mini-ticker:last-child {
+            border-bottom: none;
+        }
+
+        @media (max-width: 768px) {
+            .hero {
+                padding: 20px;
+            }
+
+            .hero h1 {
+                font-size: 1.8em;
+            }
+
+            .ranking {
+                grid-template-columns: 1fr;
+            }
+
+            .gains-losers {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <div class="navbar-content">
+            <div class="logo">📈 Stock Movers</div>
+            <div class="status">
+                <div class="live-dot"></div>
+                <span>Live Data</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="hero">
+            <h1>Stock Market Leaders</h1>
+            <p>Track the biggest daily movers in real-time</p>
+            
+            <div id="statsContainer" style="display:none;">
+                <div class="stats-grid">
+                    <div class="stat-box">
+                        <div class="stat-box-label">Today's Biggest Mover</div>
+                        <div class="stat-box-value" id="biggestMoverTicker">--</div>
+                        <div class="stat-box-label" id="biggestMoverChange">--</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-label">Total Records</div>
+                        <div class="stat-box-value" id="totalRecords">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-label">Gainers</div>
+                        <div class="stat-box-value" id="gainersCount">0</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-box-label">Losers</div>
+                        <div class="stat-box-value" id="losersCount">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="content">
+            <div class="loading">
+                <div class="loader"></div>
+                <p>Loading stock data...</p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>Last updated: <span id="lastUpdated">--</span></p>
+            <p>Data refreshes every 5 minutes</p>
+        </div>
+    </div>
+
+    <script>
+        const API_ENDPOINT = 'https://mx0u5oz062.execute-api.us-east-1.amazonaws.com/prod/movers';
+
+        async function fetchMovers() {
+            try {
+                console.log('Fetching from:', API_ENDPOINT);
+                const response = await fetch(API_ENDPOINT);
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('Data received:', data);
+                displayMovers(data);
+            } catch (error) {
+                console.error('Error:', error);
+                displayError(error.message);
+            }
+        }
+
+        function displayMovers(data) {
+            const content = document.getElementById('content');
+            const movers = data.movers || [];
+
+            if (movers.length === 0) {
+                content.innerHTML = '<div class="error">No stock data available yet. Data will populate when the market analysis runs.</div>';
+                return;
+            }
+
+            // Sort by absolute percentage change
+            const sorted = [...movers].sort((a, b) => Math.abs(b.pct_change) - Math.abs(a.pct_change));
+            
+            const gains = movers.filter(m => m.pct_change > 0).length;
+            const losses = movers.filter(m => m.pct_change < 0).length;
+            const biggest = sorted[0];
+
+            // Update stats
+            document.getElementById('statsContainer').style.display = 'block';
+            document.getElementById('biggestMoverTicker').textContent = biggest.ticker;
+            document.getElementById('biggestMoverChange').textContent = `${biggest.pct_change.toFixed(2)}%`;
+            document.getElementById('totalRecords').textContent = movers.length;
+            document.getElementById('gainersCount').textContent = gains;
+            document.getElementById('losersCount').textContent = losses;
+            document.getElementById('lastUpdated').textContent = new Date().toLocaleString();
+
+            // Build ranking cards
+            let html = '<h2 class="section-title">📊 Today\'s Rankings</h2><div class="ranking">';
+            
+            sorted.forEach((mover, index) => {
+                const isPositive = mover.pct_change > 0;
+                const changeClass = isPositive ? 'positive' : 'negative';
+                const icon = isPositive ? '📈' : '📉';
+                const barWidth = Math.min(Math.abs(mover.pct_change) * 5, 100); // Scale for visual effect
+                
+                html += `
+                    <div class="stock-card ${changeClass}">
+                        <div class="rank-badge">#${index + 1}</div>
+                        <div class="stock-header">
+                            <div class="stock-ticker">${mover.ticker}</div>
+                            <div class="live-badge">Live</div>
+                        </div>
+                        <div class="change-amount ${changeClass}">
+                            ${icon} ${isPositive ? '+' : ''}${mover.pct_change.toFixed(2)}%
+                        </div>
+                        <div class="price-info">
+                            Close: $${mover.close_price.toFixed(2)}
+                        </div>
+                        <div class="trend-bar">
+                            <div class="trend-fill ${changeClass}" style="width: ${barWidth}%"></div>
+                        </div>
+                        <div class="trend-label">
+                            ${isPositive ? 'Gaining' : 'Losing'} • ${Math.abs(mover.pct_change).toFixed(2)}% change
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+
+            // Add gains/losers breakdown
+            const gainers = movers.filter(m => m.pct_change > 0).sort((a,b) => b.pct_change - a.pct_change).slice(0, 5);
+            const losers = movers.filter(m => m.pct_change < 0).sort((a,b) => a.pct_change - b.pct_change).slice(0, 5);
+
+            html += '<div class="gains-losers">';
+            
+            html += '<div class="gains-losers-box gainers"><h3>🟢 Top Gainers</h3>';
+            gainers.forEach(g => {
+                html += `<div class="mini-ticker"><span>${g.ticker}</span><span style="color: #27ae60;">+${g.pct_change.toFixed(2)}%</span></div>`;
+            });
+            html += '</div>';
+
+            html += '<div class="gains-losers-box losers"><h3>🔴 Top Losers</h3>';
+            losers.forEach(l => {
+                html += `<div class="mini-ticker"><span>${l.ticker}</span><span style="color: #e74c3c;">${l.pct_change.toFixed(2)}%</span></div>`;
+            });
+            html += '</div>';
+
+            html += '</div>';
+            
+            content.innerHTML = html;
+        }
+
+        function displayError(message) {
+            const content = document.getElementById('content');
+            content.innerHTML = `<div class="error"><strong>⚠️ Error:</strong> ${message}</div>`;
+        }
+
+        fetchMovers();
+        setInterval(fetchMovers, 5 * 60 * 1000);
+    </script>
+</body>
+</html>

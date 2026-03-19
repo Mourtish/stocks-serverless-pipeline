@@ -116,8 +116,8 @@ resource "aws_iam_role_policy" "api_dynamodb_policy" {
 # ============================================
 data "archive_file" "ingestion_zip" {
   type        = "zip"
-  source_file = "${path.module}/../lambdas/ingestion/handler.py"
-  output_path = "${path.module}/../lambdas/ingestion/handler.zip"
+  source_dir  = "${path.module}/../lambdas/ingestion"
+  output_path = "${path.module}/../lambdas/ingestion/ingestion.zip"
 }
 
 data "archive_file" "api_zip" {
@@ -131,7 +131,7 @@ data "archive_file" "api_zip" {
 # This runs daily to fetch stock data
 # ============================================
 resource "aws_lambda_function" "ingestion" {
-  filename         = data.archive_file.ingestion_zip.output_path
+  filename         = "${path.module}/../lambdas/ingestion/ingestion.zip"
   function_name    = "${var.project_name}-ingestion"
   role             = aws_iam_role.ingestion_lambda_role.arn
   handler          = "handler.lambda_handler"

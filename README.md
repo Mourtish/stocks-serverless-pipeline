@@ -117,30 +117,6 @@ EventBridge (Cron) → Ingestion Lambda → DynamoDB ← API Lambda → API Gate
 
 ---
 
-## How to Evaluate This
-
-### 1. Review the Code
-- **Terraform:** `terraform/` — See modular infrastructure design
-- **Lambda Logic:** `lambdas/ingestion/handler.py` — See API integration and data processing
-- **API Handler:** `lambdas/api/handler.py` — See REST API design patterns
-- **Frontend:** `frontend/index.html` — See responsive UI implementation
-
-### 2. Examine Security
-- **Secrets management:** See `SECURITY_GUIDE.md` for why GitHub Codespace Secrets are used
-- **IAM roles:** `terraform/lambda.tf` — See least-privilege role definitions
-- **.gitignore:** Confirms API keys are never committed
-
-### 3. Understand Trade-offs
-- **Known Limitations:** See `README.md` Known Limitations section for honest assessment of design choices
-- **Scalability path:** Document explains how to optimize for 1000+ stocks (GSI, caching, async batching)
-
-### 4. See It Running
-- **Frontend:** Live S3 dashboard showing 7-day history
-- **API:** REST endpoint returning JSON with last 7 days of movers
-- **Logs:** CloudWatch logs demonstrating successful daily executions
-
----
-
 ## Technical Stack
 
 | Layer | Technology | Why |
@@ -307,56 +283,6 @@ DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE")    # From Terraform
 - **Mock Data:** Ingestion handler currently uses mock stock data. Real API integration requires a stock data provider (e.g., Polygon.io, Finnhub, AlphaVantage).
 - **API Retrieval:** The API Lambda scans the entire DynamoDB table, then sorts and limits to 7 days in application code. At scale, this should use Query with Global Secondary Index.
 - **Frontend Endpoint:** Hardcoded API endpoint in `frontend/index.html` requires manual update after deployment. Can be automated with environment variables in future revisions.
-
----
-
-## 🎤 How Recruiters Should Evaluate This
-
-### What to Look For
-
-This project demonstrates five core competencies:
-
-**1. Infrastructure Maturity**
-- All resources defined in Terraform (400+ lines of HCL)
-- Modular structure: separate files for each concern (lambda.tf, dynamodb.tf, eventbridge.tf, etc.)
-- Zero manual AWS Console operations
-- Reproducible deployment from git clone to working system
-
-**2. Security Mindset**
-- API key stored encrypted in GitHub Codespace Secrets (not in code, never in git)
-- Least-privilege IAM: ingestion Lambda write-only, API Lambda read-only
-- Environment variables for all credentials (follows 12-factor principles)
-- Demonstrates understanding of AWS blast radius containment
-
-**3. Production-Grade Design**
-- Separate Lambdas for ingestion and retrieval (independent failure modes and scaling)
-- Error handling with try/except blocks and graceful degradation
-- CloudWatch logs for debugging and monitoring
-- Cost-conscious architecture (~$0/month on AWS Free Tier)
-
-**4. Systems Thinking**
-- Clear data flow: schedule → fetch → store → retrieve → display
-- Understands trade-offs (Scan vs. Query, on-demand vs. provisioned, vanilla JS vs. React)
-- Acknowledges limitations (mock data, table scans, hardcoded endpoints)
-- Knows the scaling path (GSI, caching, async processing)
-
-**5. Communication**
-- Documentation is honest, not overselling
-- Design decisions have stated rationales and trade-offs
-- Code is clean and self-explaining
-- Talking points are prepared (hire someone who can explain their work)
-
-### Interview Script
-
-> *"This is a fully serverless stock market analytics pipeline. Three things I want you to see:*  
-> 
-> *First, infrastructure as code maturity. Every AWS resource is in Terraform—nothing was clicked in the console. You could tear this down and redeploy in 5 minutes. That demonstrates DevOps thinking.*
->
-> *Second, security. The API key is encrypted, IAM roles are least-privilege, and the architecture limits blast radius if either Lambda is compromised. This shows I understand the operational risks of cloud systems.*
->
-> *Third, pragmatic engineering. I chose on-demand DynamoDB over RDS (costs $0 vs. $15/month), Vanilla JS over React (no build pipeline), and EventBridge cron over external services (serverless). Each choice is a trade-off I can defend.*
->
-> *I'll be upfront: the ingestion handler currently has mock data. That was intentional—I focused on getting the architecture right before integrating the real API. I can connect the real API in an hour if you want."*
 
 ---
 

@@ -606,23 +606,3 @@ Built by YOU as part of a take-home project challenge.
 
 ---
 
-## ❓ FAQ
-
-**Q: How long does the project take?**  
-A: ~2-4 hours end-to-end (architecture + coding + deployment).
-
-**Q: Do I need AWS credits?**  
-A: No, everything fits in the free tier. Verify at the end: check your AWS Billing Dashboard.
-
-**Q: Can I use a different stock API?**  
-A: Yes! The code uses a generic API interface. Swap in Finnhub, AlphaVantage, or Polygon.io.
-
-**Q: What if the Lambda times out?**  
-A: Increase the timeout in `terraform/lambda.tf`: `timeout = 60` (seconds).
-
-**Q: Can I add more stocks to the watchlist?**  
-A: Yes! Edit `terraform/variables.tf` → `watchlist` variable.
-
----
-
-**Ready to impress recruiters? Deploy now and share the links! 🚀**

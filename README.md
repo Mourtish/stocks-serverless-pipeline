@@ -349,15 +349,6 @@ This project is open source and available under the MIT License.
 
 ---
 
-## 👤 Author
 
-Built by YOU as part of a take-home project challenge.
 
-### Notable Features You Own:
 
-✅ **Complete Terraform setup** — no AWS console clicking  
-✅ **Production-grade error handling** — API rate-limit protection  
-✅ **Security best practices** — API keys in Codespace secrets  
-✅ **Separation of concerns** — ingestion vs. retrieval decoupled  
-✅ **Clean frontend** — vanilla JS, responsive, color-coded  
-✅ **Comprehensive documentation** — this README!

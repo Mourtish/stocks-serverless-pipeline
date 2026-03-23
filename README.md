@@ -1,9 +1,8 @@
 # 📈 Stocks Serverless Pipeline
 
-A fully automated, production-grade serverless data pipeline that tracks daily stock market movements. Built with AWS (Lambda, DynamoDB, EventBridge, API Gateway, S3), Infrastructure as Code (Terraform), and a modern frontend.
+A serverless data pipeline that tracks daily stock market movements. Built with AWS (Lambda, DynamoDB, EventBridge, API Gateway, S3), Infrastructure as Code (Terraform), and a responsive frontend.
 
-**Live Demo:** [Your S3 URL will appear here after deployment]  
-**GitHub Repo:** [This repository]
+**GitHub Repo:** https://github.com/Mourtish/stocks-serverless-pipeline
 
 ---
 
@@ -40,8 +39,7 @@ Build a serverless system that:
 │                 │                                                │
 │                 └──→ DynamoDB Table (stock_movers)               │
 │                      ├─ Partition Key: date                      │
-│                      ├─ Sort Key: ticker                         │
-│                      └─ Stores: price, % change, winner flag     │
+│                      └─ Stores: ticker, price, % change          │
 │                           │                                       │
 │                           └──→ API Lambda                         │
 │                                └─ GET /movers → Last 7 days      │
@@ -83,7 +81,7 @@ Build a serverless system that:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/stocks-serverless-pipeline.git
+git clone https://github.com/Mourtish/stocks-serverless-pipeline.git
 cd stocks-serverless-pipeline
 ```
 
@@ -282,10 +280,10 @@ STOCK_API_KEY = os.getenv("STOCK_API_KEY")      # From Terraform
 DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE")    # From Terraform
 ```
 
-### 4. **Error Handling & Retry Logic** ✅
+### 4. **Error Handling & Logging** ✅
 - Try/except blocks around API calls
-- Graceful degradation if API rate-limits
 - Detailed logging for debugging
+- Graceful error responses
 
 ### 5. **S3 Bucket Policy** ✅
 ```json
@@ -296,14 +294,14 @@ DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE")    # From Terraform
 
 ---
 
-## 🎨 Features & Differentiation
+## 🎨 Architecture Highlights
 
-### What Makes This Stand Out?
+### Key Design Decisions
 
 1. **Separation of Concerns**
-   - `ingestion/` handler: Fetches + writes
-   - `api/` handler: Reads + formats
-   - Completely decoupled (can scale independently)
+   - `ingestion/` handler: Fetches stock data and writes to DynamoDB
+   - `api/` handler: Reads from DynamoDB and returns formatted JSON
+   - Completely decoupled (each can scale independently)
 
 2. **Error Handling**
    - API rate-limit protection
@@ -311,8 +309,8 @@ DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE")    # From Terraform
    - Comprehensive logging for debugging
 
 3. **Modular Terraform**
-   - Separate files: `lambda.tf`, `dynamodb.tf`, `eventbridge.tf`, etc.
-   - Easy to understand and modify
+   - Separate files by component: `lambda.tf`, `dynamodb.tf`, `eventbridge.tf`
+   - Clear separation of infrastructure concerns
    - Documented with inline comments
 
 4. **Responsive Frontend**
@@ -327,50 +325,58 @@ DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE")    # From Terraform
 
 ---
 
-## 💡 Trade-offs & Design Decisions
+## 💡 Design Decisions
 
-### Decision: EventBridge Cron vs API Triggers
+### EventBridge Cron Scheduling
 
-**We Chose:** EventBridge Cron  
-**Why:** 
-- Serverless scheduler (no EC2 needed)
-- Runs at exact time regardless of load
-- Perfect for daily batch jobs
-- Costs: ~$0.10/month
+**Implementation:** EventBridge Cron rule triggers Lambda daily at 9 PM UTC  
+**Rationale:** 
+- Serverless scheduler (no EC2 infrastructure)
+- Reliable execution at fixed time
+- Suitable for daily batch processing patterns
+- Minimal cost (~$0.10/month)
 
 **Alternative:** API trigger (webhook) would require external cron service.
 
 ---
 
-### Decision: DynamoDB On-Demand Pricing
+### DynamoDB On-Demand Pricing
 
-**We Chose:** On-demand (pay per request)  
-**Why:**
-- Very low volume: ~1-10 writes/day, ~few reads/day
-- No need to predict capacity
-- Costs: ~$0.25-$1.00/month
+**Implementation:** DynamoDB with PAY_PER_REQUEST billing  
+**Rationale:**
+- Low transaction volume (~1-10 writes/day, few reads)
+- Automatic scaling with no capacity planning
+- Cost-effective for small datasets (~$0.25–$1.00/month)
 
 **Alternative:** Provisioned capacity would cost more for our traffic.
 
 ---
 
-### Decision: Scan vs Query in API
+### Table Scan Strategy
 
-**Current:** Scan (retrieve all, filter in Lambda)  
-**Why:** Works well for small datasets (~7 days = ~70 items)  
-**Production Improvement:** Use Query with GSI (Global Secondary Index) for better performance.
+**Current Implementation:** Scan with in-memory sorting (retrieves all rows, returns top 7 by date)  
+**Trade-off:** Simple to implement, acceptable for small datasets (~70 items for 7-day window)  
+**Future Optimization:** Query with Global Secondary Index on ticker for better performance at scale
 
 ---
 
-### Decision: Vanilla JS Frontend
+### Frontend Technology
 
-**We Chose:** No framework (pure HTML/CSS/JS)  
-**Why:**
-- Simple SPA, no build step needed
-- Lightweight (~5KB total)
-- Easy to deploy to S3
+**Implementation:** Vanilla HTML/CSS/JavaScript SPA  
+**Rationale:**
+- No build step required; direct deployment to S3
+- Lightweight bundle (~5KB total)
+- Suitable for simple dashboard UI
 
-**Alternative:** Could use Next.js/Vue, but adds complexity & build step.
+**Alternative Considered:** Modern framework (Next.js/Vue) would add complexity and build pipeline for this use case
+
+---
+
+## 📌 Known Limitations
+
+- **Mock Data:** Ingestion handler currently uses mock stock data. Real API integration requires a stock data provider (e.g., Polygon.io, Finnhub, AlphaVantage).
+- **API Retrieval:** The API Lambda scans the entire DynamoDB table, then sorts and limits to 7 days in application code. At scale, this should use Query with Global Secondary Index.
+- **Frontend Endpoint:** Hardcoded API endpoint in `frontend/index.html` requires manual update after deployment. Can be automated with environment variables in future revisions.
 
 ---
 

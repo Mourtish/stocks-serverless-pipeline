@@ -1,6 +1,6 @@
-# ⚡ Quick Reference Card
+# ⚡ Quick Reference
 
-**Keep this open during your recruiter demo!**
+Technical reference and command lookup for common operations.
 
 ---
 
@@ -18,106 +18,111 @@ terraform output
 
 ---
 
-## 🚀 Pre-Demo Checklist (5 min before)
+## Deployment Checklist
 
 ```bash
-# 1. Get API key
+# 1. Load API key from secret
 export STOCK_API_KEY=$(gh secret get STOCK_API_KEY)
 
-# 2. Deploy fresh infrastructure
+# 2. Deploy infrastructure
 cd terraform
 terraform init
 terraform apply -var="stock_api_key=$STOCK_API_KEY"
 
-# 3. Generate demo data (optional, but nice)
+# 3. Manually invoke ingestion (optional)
 aws lambda invoke \
   --function-name $(terraform output -raw ingestion_lambda_name) \
-  /tmp/demo.json
+  /tmp/invoke.json
 
-# 4. Test frontend works
+# 4. Verify API endpoint works
 curl $(terraform output -raw api_endpoint) | jq '.movers[0]'
 ```
 
 ---
 
-## 📝 Demo Script (5 minutes)
+## Key Architecture Components
 
-| Time | What to Show | What to Say |
-|------|-------------|------------|
-| 0:30 | Intro | Serverless pipeline that wakes daily, fetches stocks, finds biggest mover |
-| 1:15 | **Frontend URL** | "Here's the live dashboard. Real data from DynamoDB. Green = gain, Red = loss." |
-| 1:45 | **API Endpoint** | "This is the REST API. Frontend fetches from here and renders it." |
-| 2:45 | **Terraform code** (main.tf) | "No console clicking. Every resource defined in code. Repeatable, reviewable, version-controlled." |
-| 3:15 | **Error handling** (handler.py) | "If API fails, Lambda doesn't crash. Try/except. Graceful degradation." |
-| 4:00 | **Security** (Codespace Secrets) | "API key in GitHub Secrets, never in code. Encrypted. CI/CD ready." |
-| 5:00 | **Wrap-up** | Key takeaways + Questions |
-
----
-
-## 🎤 Recruiter Q&A (Memorize These!)
-
-**Q: Why EventBridge?**  
-A: Serverless scheduler. Runs at exact time. Perfect for daily batch jobs. Costs ~$0.10/month.
+| Component | Purpose | Key File |
+|-----------|---------|----------|
+| Scheduler | Daily trigger (9 PM UTC) | `terraform/eventbridge.tf` |
+| Ingestion | Fetch & process stocks | `lambdas/ingestion/handler.py` |
+| Database | Historical data store | `terraform/dynamodb.tf` |
+| Retrieval | Last 7 days of data | `lambdas/api/handler.py` |
+| API | REST endpoint | `terraform/api_gateway.tf` |
+| Frontend | Public dashboard | `frontend/index.html` |
 
 ---
 
-**Q: Why DynamoDB?**  
-A: Serverless, auto-scales, pay-per-request. We don't need complex joins. ~$0/month for our traffic.
+## Design Rationale
+
+**EventBridge Cron vs Alternatives**
+- Serverless scheduling, no EC2 required
+- Fixed execution time suitable for daily batch
+- Cost: ~$0.10/month
+
+**DynamoDB vs RDS**
+- Serverless with automatic scaling
+- Pay-per-request model (~$0.25–$1.00/month)
+- No complex joins required for this use case
+
+**Two Lambda Functions**
+- Separation of concerns: ingestion vs retrieval
+- Independent scaling behavior
+- Failure isolation (ingestion failure doesn't affect API)
+
+**Scanning vs Querying DynamoDB**
+- Current: Scan all rows, sort and limit in application
+- Suitable for small datasets (~70 items for 7 days)
+- Future optimization: Add GSI for query efficiency at scale
 
 ---
 
-**Q: What if API is down?**  
-A: Try/except block. Lambda logs error, skips that stock, continues. Returns graceful failure. Previous day's data still in DB.
-
----
-
-**Q: Why two Lambdas?**  
-A: Separation of concerns. Ingestion writes, API reads. They can scale independently. Clean architecture.
-
----
-
-**Q: How scale to 1000 stocks?**  
-A: Batch API calls (async), add GSI on ticker, CloudFront caching, Lambda reserved concurrency.
-
----
-
-## 🔐 Codespace Secrets (One-Liner)
+## Secret Management
 
 ```bash
-# First time: set secret
+# Store API key
 gh secret set STOCK_API_KEY
 
-# Always: use it
+# Retrieve and use
 export STOCK_API_KEY=$(gh secret get STOCK_API_KEY)
 ```
 
-**Why?** Encrypted, never in shell history, works in CI/CD, perfect for demos.
+**Rationale:** Encrypted storage, no exposure to shell history, CI/CD compatible
 
 ---
 
-## 🐛 Emergency Fixes (During Demo)
+## Common Troubleshooting
 
-**"Frontend shows error"?**
+**Frontend displays empty data**
 ```bash
-# Update API URL in frontend/index.html
-FRONTEND_BUCKET=$(terraform output -raw frontend_bucket_name)
-aws s3 cp frontend/index.html s3://$FRONTEND_BUCKET/
-# Hard refresh (Ctrl+Shift+R) in browser
+# Frontend API endpoint may be outdated
+# Update hardcoded URL in frontend/index.html with current API Gateway URL
+API_URL=$(terraform output -raw api_endpoint)
+
+# Redeploy frontend
+aws s3 cp frontend/index.html s3://$(terraform output -raw frontend_bucket_name)/
+
+# Clear browser cache (hard refresh: Ctrl+Shift+R)
 ```
 
-**"API returns empty"?**
+**API returns no records**
 ```bash
-# Trigger ingestion (generate dummy data)
+# Manually trigger ingestion Lambda
 aws lambda invoke \
   --function-name $(terraform output -raw ingestion_lambda_name) \
-  /tmp/invoke.json
-# Refresh frontend
+  /tmp/response.json
+
+# Wait ~5 seconds, then check DynamoDB
+aws dynamodb scan --table-name stock_movers --region us-east-1
 ```
 
-**"Lambda not found"?**
+**Lambda function not found**
 ```bash
-# Redeploy infrastructure
+# Verify infrastructure is deployed
 cd terraform
+terraform output
+
+# If missing, redeploy
 terraform apply -var="stock_api_key=$STOCK_API_KEY"
 ```
 
@@ -137,61 +142,87 @@ terraform apply -var="stock_api_key=$STOCK_API_KEY"
 
 ---
 
-## 🎯 Key Talking Points
+## Architecture Summary
 
-- ✅ **Architecture:** Serverless—no VMs, no uptime worries
-- ✅ **DevOps:** Every resource as code—fully reproducible
-- ✅ **Security:** Secrets encrypted, least-privilege IAM
-- ✅ **Cost:** ~$0/month, within AWS free tier
-- ✅ **Separation of Concerns:** Ingestion ≠ Retrieval ≠ Frontend
-- ✅ **Error Handling:** Graceful failures, detailed logging
+**Serverless Design**
+- No EC2 instances or long-running processes
+- Event-driven scheduling via EventBridge
+- Auto-scaling compute via Lambda
 
----
+**Infrastructure as Code**
+- Fully defined in Terraform
+- Version-controlled and reproducible
+- No manual AWS Console operations
 
-## 🔍 Files Recruiters Will Look At
+**Security**
+- Encrypted secret storage (GitHub Codespace Secrets)
+- Least-privilege IAM roles per Lambda
+- Environment variables for configuration
 
-1. **README.md** ← Most important (overview + commands)
-2. **terraform/main.tf** (provider + general config)
-3. **terraform/eventbridge.tf** (the daily trigger!)
-4. **terraform/lambda.tf** (IAM roles, error handling)
-5. **lambdas/ingestion/handler.py** (the logic)
-6. **lambdas/api/handler.py** (REST response)
-7. **frontend/index.html** (UI)
-8. **.gitignore** (secrets not committed—good practice!)
+**Cost Efficiency**
+- Pay-per-request billing (Lambda, DynamoDB, API Gateway)
+- Fits entirely within AWS Free Tier first year
+- Estimated monthly cost: ~$0.25–$1.00
 
----
-
-## ⏱️ Timeline
-
-| Phase | Time | Status |
-|-------|------|--------|
-| **Intro** | 0:00-0:30 | One-liner pitch |
-| **Demo** | 0:30-2:00 | Frontend + API |
-| **Code** | 2:00-3:15 | Show Terraform + error handling |
-| **Discussion** | 3:15-5:00 | Security + Q&A |
+**Separation of Concerns**
+- Ingestion pipeline independent from API layer
+- Database layer decoupled from compute
+- Each component can scale independently
 
 ---
 
-## 💾 Bookmark These URLs
+## Project Files Reference
 
-1. **Terraform Docs:** https://registry.terraform.io/providers/hashicorp/aws/latest/docs
-2. **AWS Lambda Docs:** https://docs.aws.amazon.com/lambda/
-3. **DynamoDB Pricing:** https://aws.amazon.com/dynamodb/pricing/on-demand/
-4. **Your GitHub Repo:** https://github.com/YOUR_USERNAME/stocks-serverless-pipeline
-
----
-
-## ✨ Final Checklist (Right Before Presenting)
-
-- [ ] API key imported: `echo $STOCK_API_KEY` (should not be empty)
-- [ ] Infrastructure deployed: `terraform output` (shows 4+ outputs)
-- [ ] Frontend accessible: Open URL in browser (shows table)
-- [ ] API working: `curl API_ENDPOINT | jq .` (returns JSON)
-- [ ] Code reviewed: You understand every line
-- [ ] Practice script: You've rehearsed the 5-min demo
-- [ ] Links saved: Have URLs in your notes
-- [ ] Terminal ready: Clean, no sensitive data visible
+| File | Purpose |
+|------|---------|
+| `README.md` | Project overview and setup instructions |
+| `terraform/main.tf` | AWS provider and general configuration |
+| `terraform/eventbridge.tf` | Daily scheduler definition |
+| `terraform/lambda.tf` | Lambda functions and IAM roles |
+| `terraform/dynamodb.tf` | Stock movers table schema |
+| `lambdas/ingestion/handler.py` | Stock data fetching logic |
+| `lambdas/api/handler.py` | REST API response formatting |
+| `frontend/index.html` | Dashboard UI |
+| `.gitignore` | Prevents committing secrets |
 
 ---
 
-**You're ready. Go impress them. 🚀**
+## Command Reference
+
+**Deploy Infrastructure**
+```bash
+export STOCK_API_KEY=$(gh secret get STOCK_API_KEY)
+cd terraform
+terraform init
+terraform apply -var="stock_api_key=$STOCK_API_KEY"
+```
+
+**Query DynamoDB**
+```bash
+aws dynamodb scan \
+  --table-name stock_movers \
+  --region us-east-1
+```
+
+**Invoke Lambda Manually**
+```bash
+aws lambda invoke \
+  --function-name stocks-pipeline-ingestion \
+  /tmp/response.json
+```
+
+**Test API Endpoint**
+```bash
+curl $(terraform output -raw api_endpoint) | jq .
+```
+
+**View CloudWatch Logs**
+```bash
+aws logs tail /aws/lambda/stocks-pipeline-ingestion --follow
+```
+
+**Destroy Infrastructure**
+```bash
+cd terraform
+terraform destroy -var="stock_api_key=$STOCK_API_KEY"
+```

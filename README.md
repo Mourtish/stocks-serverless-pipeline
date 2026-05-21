@@ -1,353 +1,86 @@
-# 📈 Stocks Serverless Pipeline
+# Stocks Serverless Pipeline
 
-**A production-grade serverless data pipeline demonstrating cloud architecture, DevOps practices, and systems thinking.**
+Concise, production-style serverless pipeline that finds the daily biggest stock mover from a watchlist and exposes a 7‑day history via a public API and static dashboard.
 
----
+Why this repo matters: it demonstrates cloud architecture, Infrastructure-as-Code, and secure, cost-aware engineering practices you can interview on or reuse in real projects.
 
-## Executive Summary
+Highlights
+- Event-driven ingestion (AWS EventBridge → Lambda)
+- Data storage with DynamoDB (on‑demand)
+- Public API (API Gateway → Lambda)
+- Static dashboard hosted on S3
+- Infrastructure fully defined in Terraform
 
-This project demonstrates a **completely automated, event-driven stock market analytics system** built entirely on AWS serverless technologies. It showcases:
+Quick TL;DR
+- Purpose: Run a daily batch that computes the single biggest intraday mover from a watchlist and stores the result.
+- Intended audience: engineers, hiring managers, recruiters evaluating architecture and cloud/DevOps skills.
 
-- **Architectural thinking:** Clean separation of concerns with independent scaling
-- **Cloud fluency:** Proper use of managed services (Lambda, DynamoDB, EventBridge, API Gateway)
-- **Infrastructure as Code:** 100% Terraform-defined with zero manual AWS Console operations
-- **Security mindset:** Encrypted secret management, least-privilege IAM roles, secure credential handling
-- **Cost optimization:** Entire system runs on AWS Free Tier (~$0/month)
+Repository layout (high level)
+- `lambdas/ingestion`: daily ingestion Lambda (fetches OHLC, computes % change, writes DynamoDB)
+- `lambdas/api`: API Lambda that returns the last 7 days of movers
+- `frontend/index.html`: small SPA that visualizes results
+- `terraform/`: all infrastructure (Lambda, DynamoDB, EventBridge, API Gateway, S3)
 
-**Live Demo:** [S3 Frontend URL]  
-**GitHub:** https://github.com/Mourtish/stocks-serverless-pipeline
+Tech stack
+- Compute: AWS Lambda (Python)
+- Scheduler: EventBridge cron rule
+- Database: DynamoDB (PAY_PER_REQUEST)
+- API: API Gateway (HTTP)
+- Frontend: S3 static hosting
+- IaC: Terraform
 
----
+Quickstart (deploy to AWS)
+Prerequisites: `terraform` (1.0+), AWS account with CLI configured, Python 3.9+ for packaging lambdas.
 
-## The Problem & Approach
+1. Review and set Terraform variables in `terraform/variables.tf` (region, watchlist, credentials).
+2. Initialize and plan:
 
-**Business Problem:**  
-Track the single highest-performing stock from a watchlist daily, maintain historical records, and expose this data via a public API.
-
-**Engineering Solution:**  
-Rather than a traditional cron job on an EC2 instance, this uses a **fully serverless architecture** where:
-- A scheduled Lambda wakes up once daily (post market close)
-- Fetches stock data from a real market API
-- Calculates percentage change for each security
-- Identifies the "biggest mover"
-- Records the result in DynamoDB
-- A separate API Lambda serves this data via REST
-- Frontend dashboard visualizes the 7-day history
-
-This design prioritizes **maintainability, cost efficiency, and scalability** over simplicity.
-
----
-
-## Architecture & Design
-
-### System Design
-
-```
-EventBridge (Cron) → Ingestion Lambda → DynamoDB ← API Lambda → API Gateway → Frontend (S3)
+```bash
+cd terraform
+terraform init
+terraform plan -out plan.tf
 ```
 
-**Data Flow:**
-1. **Ingestion Pipeline** (triggered daily at 9 PM UTC / 4 PM EST - post market close)
-   - Fetch OHLC data for 10 stock tickers from market API
-   - Calculate intraday percentage change: `((Close - Open) / Open) × 100`
-   - Identify stock with highest absolute % change
-   - Write date-stamped record to DynamoDB
+3. Apply (creates infra):
 
-2. **Retrieval API** (Lambda + API Gateway)
-   - Query last 7 days of biggest movers
-   - Return formatted JSON response
-   - Cache-friendly endpoint design
-
-3. **Frontend** (Static S3 website)
-   - Real-time dashboard fetching from API
-   - Color-coded visualization (green = gain, red = loss)
-   - Responsive design for mobile/desktop
-
-### Key Design Decisions
-
-**1. EventBridge Cron for Scheduling**
-- **Why:** Serverless event scheduler, no infrastructure to maintain
-- **Alternative considered:** Lambda with CloudWatch Events (less flexible for complex triggers)
-- **Trade-off:** Fixed 9 PM UTC trigger; would need SQS for dynamic scheduling at scale
-
-**2. DynamoDB with On-Demand Pricing**
-- **Why:** Serverless database auto-scales, no capacity planning needed, cost-efficient for low traffic (~$0/month)
-- **Alternative considered:** RDS PostgreSQL (would require managed instances, higher baseline cost)
-- **Trade-off:** Scan-based queries work for ~70 items (7 days); at scale would add Global Secondary Index
-
-**3. Separate Ingestion & API Lambdas**
-- **Why:** Clean separation of concerns; ingestion can fail independently from API; each scales separately
-- **Alternative considered:** Single Lambda handling both (simpler, but tightly coupled)
-- **Trade-off:** Adds slight operational complexity but improves resilience
-
-**4. Least-Privilege IAM Roles**
-- **Ingestion Lambda:** `PutItem` only (write-only access to DynamoDB)
-- **API Lambda:** `GetItem`, `Scan` only (read-only access to DynamoDB)
-- **Why:** If either Lambda is compromised, attacker has minimal blast radius
-- **Impact:** Follows AWS security best practice; demonstrates DevOps maturity
-
----
-
-## What This Demonstrates
-
-### Infrastructure as Code Mastery
-- **100% Terraform-defined.** Every resource (Lambda, DynamoDB, API Gateway, IAM, EventBridge, S3) is in version control.
-- **Zero manual operations.** No clicking AWS Console; entire deployment is scripted and reproducible.
-- **Modular structure:** Separate `.tf` files for each concern (`lambda.tf`, `dynamodb.tf`, `eventbridge.tf`, `api_gateway.tf`, `s3.tf`)
-- **Parameterized & reusable:** Variables for region, project name, and API credentials—easy to adapt for new use cases.
-
-### Security & Compliance
-- **Encrypted secret storage:** Stock API key stored in GitHub Codespace Secrets (encrypted at rest, no shell history exposure)
-- **Least-privilege IAM:** Each Lambda has minimal permissions (ingestion: write-only; API: read-only)
-- **No hardcoded credentials:** All sensitive data passed via environment variables
-- **Audit trail:** All infrastructure changes are git-tracked and reviewable
-
-### Cost Optimization
-- **AWS Free Tier:** Entire system costs ~$0/month
-  - Lambda: 1M invocations free (we use ~30)
-  - DynamoDB: On-demand pricing, ~$0 for our traffic
-  - API Gateway: 1M requests free (we use ~30)
-  - EventBridge: ~$0 for 365 events/year
-- **Shows business acumen:** Demonstrates ability to build without burning money
-
-### Production-Grade Practices
-- **Error handling & logging:** Try/except blocks, detailed CloudWatch logs
-- **Graceful degradation:** If stock API fails, system logs error and continues
-- **Tested architecture:** Separation of concerns allows independent testing and scaling
-
----
-
-## Technical Stack
-
-| Layer | Technology | Why |
-|-------|-----------|-----|
-| **Scheduling** | AWS EventBridge | Serverless, reliable cron, no EC2 needed |
-| **Compute** | AWS Lambda (Python) | Auto-scales, pay-per-use, fast cold starts |
-| **Database** | Amazon DynamoDB | Serverless, on-demand pricing, perfect for this access pattern |
-| **API** | API Gateway v2 (HTTP) | Lightweight, handles auth/CORS, integrates with Lambda |
-| **Frontend** | S3 Static Hosting | No server ops, built-in CDN, $0 cost |
-| **Infrastructure** | Terraform | Version-controlled, reproducible, industry standard |
-| **Secrets** | GitHub Codespace Secrets | Encrypted, CI/CD-friendly, no shell history leak |
-
----
-
-## Key Insights About the Code
-
-### Separation of Concerns
-```
-ingestion/ → writes to DB
-api/       → reads from DB
-frontend/  → consumes API
-```
-Each can be modified, scaled, or deployed independently. Resilient design.
-
-### Error Handling Pattern
-```python
-try:
-    # Fetch stock data
-    response = requests.get(url)
-    # Process data
-except Exception as e:
-    print(f"[ERROR] Failed: {str(e)}")  # CloudWatch logs
-    continue  # Don't crash; try next stock
-return {"statusCode": 200, "body": "Completed"}  # Always return success if partial data collected
-```
-This is production-grade—gracefully handles partial failures.
-
-### IAM Principle of Least Privilege
-```hcl
-# Ingestion can ONLY write
-Action = ["dynamodb:PutItem"]
-
-# API can ONLY read  
-Action = ["dynamodb:GetItem", "dynamodb:Scan"]
-```
-If API Lambda is ever compromised, attacker cannot delete historical data.
-
----
-
-## 🔑 Security & Best Practices
-
-### 1. **API Keys are NOT in Git** ✅
-- Stored in GitHub Codespace secrets
-- Referenced via environment variables in Terraform
-- Marked as `sensitive = true` in Terraform (hidden from logs)
-
-### 2. **Least Privilege IAM Roles** ✅
-```hcl
-# Each Lambda gets ONLY the permissions it needs
-# Ingestion Lambda: DynamoDB write-only
-# API Lambda: DynamoDB read-only
+```bash
+terraform apply "plan.tf"
 ```
 
-### 3. **Environment Variables, Not Hardcoding** ✅
-```python
-STOCK_API_KEY = os.getenv("STOCK_API_KEY")      # From Terraform
-DYNAMODB_TABLE = os.getenv("DYNAMODB_TABLE")    # From Terraform
+4. After deploy, Terraform outputs include the API endpoint and S3 website URL.
+
+Local development notes
+- Run a handler locally for quick testing:
+
+```bash
+python3 lambdas/ingestion/handler.py    # unit-style invocation (depends on local env vars)
+python3 lambdas/api/handler.py          # local invoke for quick checks
 ```
 
-### 4. **Error Handling & Logging** ✅
-- Try/except blocks around API calls
-- Detailed logging for debugging
-- Graceful error responses
+- Unit / integration: test the core logic in `lambdas/ingestion/handler.py` and `lambdas/api/handler.py`.
 
-### 5. **S3 Bucket Policy** ✅
-```json
-// S3 bucket is PUBLIC for GET (read) only
-// No PUT/DELETE allowed from internet
-// Only authenticated users can modify via AWS CLI
-```
+Security & operational notes (for reviewers)
+- Secrets are not checked into Git — provide API keys via Terraform variables or CI secrets.
+- IAM roles follow least‑privilege: ingestion has write-only to DynamoDB; API has read-only access.
+- Designed for low cost (AWS Free Tier friendly) and graceful degradation on third‑party API failures.
 
----
+Known limitations
+- The ingestion pipeline currently uses a mock or placeholder data source in some branches; replace with your stock data provider (Polygon, Finnhub, AlphaVantage) and update request handling.
+- The API currently scans and sorts small datasets in memory — acceptable for the demo scale. Add a GSI or query pattern for larger datasets.
+- `frontend/index.html` contains a hardcoded API URL placeholder — update after deployment or template during CI.
 
-## 🎨 Architecture Highlights
+Notes for recruiters / reviewers
+- Look in `terraform/` for IaC best practices and modular resource definitions.
+- `lambdas/` shows production-aware error handling, logging, and dependency vendoring for cold starts.
+- The repo is designed to showcase cloud architecture thinking and secure, repeatable deployments.
 
-### Key Design Decisions
+Next steps I can take (pick one):
+- commit this README update and push to `main` for you
+- open a short PR instead of a direct push
 
-1. **Separation of Concerns**
-   - `ingestion/` handler: Fetches stock data and writes to DynamoDB
-   - `api/` handler: Reads from DynamoDB and returns formatted JSON
-   - Completely decoupled (each can scale independently)
+License
+- MIT
 
-2. **Error Handling**
-   - API rate-limit protection
-   - Graceful failures (doesn't crash if API down)
-   - Comprehensive logging for debugging
-
-3. **Modular Terraform**
-   - Separate files by component: `lambda.tf`, `dynamodb.tf`, `eventbridge.tf`
-   - Clear separation of infrastructure concerns
-   - Documented with inline comments
-
-4. **Responsive Frontend**
-   - Mobile-friendly design
-   - Real-time data fetching
-   - Color-coded movers (green/red)
-
-5. **Vendor Packaging** (Advanced)
-   - Dependencies bundled in Lambda zip
-   - Supports Lambda execution role restrictions
-   - No internet access needed at runtime
-
----
-
-## 💡 Design Decisions
-
-### EventBridge Cron Scheduling
-
-**Implementation:** EventBridge Cron rule triggers Lambda daily at 9 PM UTC  
-**Rationale:** 
-- Serverless scheduler (no EC2 infrastructure)
-- Reliable execution at fixed time
-- Suitable for daily batch processing patterns
-- Minimal cost (~$0.10/month)
-
-**Alternative:** API trigger (webhook) would require external cron service.
-
----
-
-### DynamoDB On-Demand Pricing
-
-**Implementation:** DynamoDB with PAY_PER_REQUEST billing  
-**Rationale:**
-- Low transaction volume (~1-10 writes/day, few reads)
-- Automatic scaling with no capacity planning
-- Cost-effective for small datasets (~$0.25–$1.00/month)
-
-**Alternative:** Provisioned capacity would cost more for our traffic.
-
----
-
-### Table Scan Strategy
-
-**Current Implementation:** Scan with in-memory sorting (retrieves all rows, returns top 7 by date)  
-**Trade-off:** Simple to implement, acceptable for small datasets (~70 items for 7-day window)  
-**Future Optimization:** Query with Global Secondary Index on ticker for better performance at scale
-
----
-
-### Frontend Technology
-
-**Implementation:** Vanilla HTML/CSS/JavaScript SPA  
-**Rationale:**
-- No build step required; direct deployment to S3
-- Lightweight bundle (~5KB total)
-- Suitable for simple dashboard UI
-
-**Alternative Considered:** Modern framework (Next.js/Vue) would add complexity and build pipeline for this use case
-
----
-
-## 📌 Known Limitations
-
-- **Mock Data:** Ingestion handler currently uses mock stock data. Real API integration requires a stock data provider (e.g., Polygon.io, Finnhub, AlphaVantage).
-- **API Retrieval:** The API Lambda scans the entire DynamoDB table, then sorts and limits to 7 days in application code. At scale, this should use Query with Global Secondary Index.
-- **Frontend Endpoint:** Hardcoded API endpoint in `frontend/index.html` requires manual update after deployment. Can be automated with environment variables in future revisions.
-
----
-
-## 📚 Project Structure
-
-```
-stocks-serverless-pipeline/
-├── README.md                 ← You are here
-├── lambdas/
-│   ├── ingestion/           ← Fetches stocks, finds biggest mover
-│   │   ├── handler.py       ← Main Lambda logic
-│   │   ├── requirements.txt ← Python dependencies
-│   │   └── vendor/          ← Vendored deps (boto3, requests, etc.)
-│   └── api/
-│       └── handler.py       ← REST API logic (GET /movers)
-├── frontend/
-│   └── index.html           ← Single-page application
-├── terraform/               ← Infrastructure as Code
-│   ├── main.tf              ← Provider + general config
-│   ├── variables.tf         ← Input variables (aws_region, watchlist, etc.)
-│   ├── outputs.tf           ← Terraform outputs (API URL, S3 URL, etc.)
-│   ├── lambda.tf            ← Lambda functions + roles + layers
-│   ├── dynamodb.tf          ← DynamoDB table
-│   ├── eventbridge.tf       ← EventBridge cron rule
-│   ├── api_gateway.tf       ← API Gateway HTTP endpoint
-│   ├── s3.tf                ← S3 bucket + static website config
-│   ├── terraform.tfstate    ← Terraform state (tracks what exists)
-│   └── terraform.tfstate.backup ← Backup of state
-└── aws/                     ← AWS CLI helpers
-    └── install              ← Script to install AWS CLI
-```
-
----
-
-## 💰 Cost Estimate (AWS Free Tier)
-
-| Service | Free Tier | Monthly Cost (Typical) |
-|---------|-----------|---------|
-| **Lambda** | 1M invocations | ~$0 (well below limit) |
-| **DynamoDB** | 25 GB storage + 25 RCU/WCU | ~$0 (on-demand, light usage) |
-| **API Gateway** | 1M requests | ~$0 (well below limit) |
-| **EventBridge** | 14.2M events | ~$0 (1 event/day = 365 events/year) |
-| **S3** | 5 GB storage | ~$0 (frontend is <1 MB) |
-| **CloudWatch** | 5 GB logs | ~$0 (well below limit) |
-| **Total** | | **~$0.00/month** |
-
-*All free tier! No credit card charges for reasonable usage.*
-
----
-
-## 🔗 Useful Links
-
-- [AWS Lambda Documentation](https://docs.aws.amazon.com/lambda/)
-- [Terraform AWS Provider](https://registry.terraform.io/providers/hashicorp/aws/latest/docs)
-- [EventBridge Cron Syntax](https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-cron-expressions.html)
-- [DynamoDB Pricing](https://aws.amazon.com/dynamodb/pricing/on-demand/)
-- [Polygon.io API Docs](https://polygon.io/docs/stocks) (or your chosen provider)
-
----
-
-## 📄 License
-
-This project is open source and available under the MIT License.
-
----
 
 
 

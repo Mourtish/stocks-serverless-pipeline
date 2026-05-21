@@ -74,9 +74,6 @@ Notes for recruiters / reviewers
 - `lambdas/` shows production-aware error handling, logging, and dependency vendoring for cold starts.
 - The repo is designed to showcase cloud architecture thinking and secure, repeatable deployments.
 
-Next steps I can take (pick one):
-- commit this README update and push to `main` for you
-- open a short PR instead of a direct push
 
 License
 - MIT
